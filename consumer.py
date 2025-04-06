@@ -48,21 +48,12 @@ def generate_consumer():
         fake.boolean(),
         random.randint(-191, 389),
         random.randint(200, 2000),
+        random.randint(-1, 380),
+        random.randint(-1, 429),
+        random.randint(-16, 114)
     )
-
-    devices = [
-        (
-            fake.uuid4(),
-            account_number,
-            random.choice(device_oses),
-            random.randint(0, 3),
-            random.randint(0, 1),
-            fake.boolean()
-        )
-        for _ in range(num_devices)
-    ]
     
-    return consumer, devices
+    return consumer
 
 # Insert Consumers & Devices in Batches
 for _ in tqdm(range(num_consumers // batch_size), desc="Generating Consumers"):
@@ -81,7 +72,8 @@ for _ in tqdm(range(num_consumers // batch_size), desc="Generating Consumers"):
         INSERT INTO consumers (
             account_number, income, customer_age, employment_status, housing_status, 
             name_email_similarity, email_is_free, phone_home_valid, phone_mobile_valid, 
-            bank_months_count, has_other_cards, credit_risk_score, proposed_credit_limit
+            bank_months_count, has_other_cards, credit_risk_score, proposed_credit_limit,
+            prev_address_months_count, current_address_months_count, intended_balcon_amount
         ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
         """,
         batch_consumers
