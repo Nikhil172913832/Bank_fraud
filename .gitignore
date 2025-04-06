@@ -2,3 +2,5 @@
 archive
 2
 data.csv
+producer.log
+consumer.log

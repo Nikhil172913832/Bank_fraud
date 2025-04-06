@@ -12,6 +12,7 @@ import uuid
 import hashlib
 from datetime import datetime, timedelta, date
 import psycopg2
+from decimal import Decimal
 from psycopg2.extras import execute_batch
 from collections import defaultdict
 
@@ -75,6 +76,8 @@ class FraudSimulator:
         def custom_serializer(obj):
             if isinstance(obj, (datetime, date)):
                 return obj.isoformat()
+            if isinstance(obj, Decimal):
+                return float(obj)
             return obj  # fallback to default for other types
         # Kafka Producer Configuration
         self.producer = KafkaProducer(
@@ -231,11 +234,13 @@ class FraudSimulator:
             sender_data = self.consumers.get(sender_id, {})
             sender_balance = sender_data.get("balance", 1000)
             avg_txn_amount = sender_data.get("avg_txn_amount", 100)
+            if avg_txn_amount is None:
+                avg_txn_amount = 100
             
             if is_fraud:
                 # Fraudsters try to drain accounts quickly but avoid detection thresholds
                 amount = min(
-                    sender_balance * random.uniform(0.1, 0.4),
+                    float(sender_balance) * random.uniform(0.1, 0.4),
                     random.uniform(50, 500)
                 )
                 # Sometimes they test with small amounts first
@@ -249,7 +254,7 @@ class FraudSimulator:
             
             # Update balance
             if sender_id in self.consumers:
-                self.consumers[sender_id]['balance'] = max(0, sender_balance - amount)
+                self.consumers[sender_id]['balance'] = Decimal(max(0, float(sender_balance) - amount))
             
             # Merchant pattern
             merchant_category = random.choice(selected_merchants)
@@ -337,12 +342,12 @@ class FraudSimulator:
                 "source": source,
                 "device_os": device_os,
                 "browser": random.choices(browsers, browser_weights)[0] if source == "WEB" else None,
-                "zip_code": random.choice(zip_history),
+                "zip_code": random.choice(zip_history) if zip_history else fake.zipcode(),
                 "merchant_category": random.choice(
                     ["Money Transfer", "Gift Cards", "Gambling"] 
                     if random.random() < 0.5 else merchant_categories
                 ),
-                "ip_address": random.choice(ip_history),
+                "ip_address": random.choice(ip_history) if ip_history else fake.zipcode(),
                 "session_id": str(uuid.uuid4()),
                 "account_age_days": sender_data.get("account_age_days", 0),
                 "fraud_bool": True,
@@ -422,8 +427,8 @@ class FraudSimulator:
             if i == drain_attempts - 1:  # Last transaction takes everything left
                 amount = total_balance
             else:
-                amount = total_balance * random.uniform(0.4, 0.8)
-                total_balance -= amount
+                amount = float(total_balance) * random.uniform(0.4, 0.8)
+                total_balance -= Decimal(amount)
             
             # Execute transaction
             drain_tx = {
@@ -460,13 +465,10 @@ class FraudSimulator:
         # Special case simulations
         if random.random() < 0.00001:
             return self.simulate_money_laundering(current_time)
-
         if random.random() < 0.000007:
             return self.simulate_account_takeover(current_time)
-
         if random.random() < 0.0003:
             return self.simulate_burst(current_time, is_fraud=True)
-
         if random.random() < 0.0002:
             return self.simulate_burst(current_time, is_fraud=False)
 
@@ -694,52 +696,49 @@ class FraudSimulator:
         topic = "transactions"
         try:
             while True:
-                # Determine number of transactions to send this cycle
                 num_txns = np.random.poisson(lam=avg_txn_rate)
-                
+
                 for _ in range(num_txns):
-                    # Select two different users for sender and receiver
                     user_ids = list(self.consumers.keys())
                     if len(user_ids) < 2:
                         log.warning("Not enough users to create transactions")
                         continue
-                        
-                    users = random.sample(user_ids, 2)
-                    sender_id = users[0]
-                    receiver_id = users[1]
-                    
-                    # Generate transaction(s)
+
+                    sender_id, receiver_id = random.sample(user_ids, 2)
+
                     transactions = self.generate_transaction(
                         sender_id,
                         receiver_id,
                         self.current_time,
                         fraud_ratio=0.005
                     )
-                    
-                    # Send each transaction to Kafka
+
                     for transaction in transactions:
                         transaction_id = transaction["transaction_id"]
                         transaction["timestamp"] = transaction["timestamp"].isoformat()
+                        if transaction['fraud_bool'] == 1:
+                            print(f"Fraud transaction: {transaction}")
                         self.producer.send(
                             topic,
                             key=transaction_id.encode("utf-8"),
                             value=transaction
                         ).add_callback(self.on_send_success).add_errback(self.on_send_error)
                         log.debug(f"Produced transaction: {transaction_id}")
-                
-                # Optionally update the consumer state in the DB periodically
+
                 self.update_consumer_state()
-                
-                # Flush messages to ensure delivery
                 self.producer.flush()
-                
-                # Update current time for next iteration and sleep for 1 second
                 self.current_time = datetime.now()
                 time.sleep(1)
+
         except KeyboardInterrupt:
             log.info("Transaction producer stopped by user.")
         except Exception as e:
             log.error(f"Error in transaction producer: {e}")
+        finally:
+            log.info("Closing Kafka producer...")
+            self.producer.flush(timeout=10)
+            self.producer.close(timeout=10)
+
         
 # Example usage:
 if __name__ == "__main__":
