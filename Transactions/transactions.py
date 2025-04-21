@@ -1,3 +1,4 @@
+#Imports
 import random
 import time
 import msgpack
@@ -14,7 +15,7 @@ from datetime import datetime, timedelta, date
 import psycopg2
 from decimal import Decimal
 from psycopg2.extras import execute_batch
-from collections import defaultdict
+import yaml
 
 # Initialize logger
 logging.basicConfig(
@@ -31,43 +32,22 @@ Faker.seed(0)
 random.seed(0)
 np.random.seed(0)
 
-# Merchant categories and risk levels
-merchant_categories = [
-    "Grocery", "Electronics", "Clothing", "Restaurants", "Gas", "Travel",
-    "Health", "Entertainment", "Utilities", "Online Services", "Gambling",
-    "Jewelry", "Gift Cards", "Money Transfer"
-]
-
-# Risk levels for merchants (higher number = higher risk)
-merchant_risk = {
-    "Grocery": 1, 
-    "Electronics": 4, 
-    "Clothing": 2, 
-    "Restaurants": 1, 
-    "Gas": 2, 
-    "Travel": 3, 
-    "Health": 2, 
-    "Entertainment": 3, 
-    "Utilities": 1, 
-    "Online Services": 4,
-    "Gambling": 5,
-    "Jewelry": 5,
-    "Gift Cards": 5,
-    "Money Transfer": 5
-}
-
-# Time-based patterns
-high_risk_hours = list(range(1, 5))  # 1 AM to 4 AM
-high_risk_dates = [1, 15, 30]  # First, middle, and end of month (payday)
-
-# Browser types for web transactions
-browsers = ["Chrome", "Firefox", "Safari", "Edge", "Opera", "Unknown"]
-browser_weights = [0.45, 0.25, 0.2, 0.05, 0.03, 0.02]
+#Loading constants from YAML file
+with open("constants.yaml", "r") as file:
+    data = yaml.safe_load(file)
+merchant_categories = data["merchant_categories"]
+merchant_risk = data["merchant_risk"]
+browsers = data["browsers"]
+browser_weights = data["browser_weights"]
+countries = data["countries"]
+high_risk_hours = list(range(1, 5))
+high_risk_dates = [1, 15, 30]
 
 class FraudSimulator:
     def __init__(self):
         # Database Setup
-        self.DB_URL = os.getenv("DB_URL", "postgresql://darklord:04112005@localhost:5432/bank_fraud")
+        self.DB_URL = os.getenv("DB_URL")
+        assert self.DB_URL, "DB_URL environment variable not set"
         self.engine = create_engine(self.DB_URL)
         self.Session = sessionmaker(bind=self.engine)
         self.current_time = datetime.now()
@@ -95,7 +75,7 @@ class FraudSimulator:
         ))
         self.mule_accounts = set(random.sample(list(self.consumers.keys()), 30))
         
-    from sqlalchemy import text
+    
 
     def fetch_all_consumers(self):
         try:
@@ -554,6 +534,7 @@ class FraudSimulator:
                 "session_id": account_change["session_id"],  # Same session
                 "account_age_days": victim_data.get('account_age_days', 0),
                 "fraud_bool": True,
+                "browser": account_change["browser"],  # Same browser as the credential change
                 "pattern": f"account_takeover_drain_{i+1}",
                 "device_fingerprint": device_fingerprint,
                 "country_code": country_code,

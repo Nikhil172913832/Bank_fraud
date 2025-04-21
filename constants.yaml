@@ -1,0 +1,60 @@
+# Higher numbers indicate higher risk
+merchant_category:
+  Grocery: 1
+  Electronics: 4
+  Clothing: 2
+  Restaurants: 1
+  Gas: 2
+  Travel: 3
+  Health: 2
+  Entertainment: 3
+  Utilities: 1
+  Online Services: 4
+  Gambling: 5
+  Jewelry: 5
+  Gift Cards: 5
+  Money Transfer: 5
+browsers:
+  - Chrome
+  - Firefox
+  - Safari
+  - Edge
+  - Opera
+  - Unknown
+browser_weights:
+  - 0.45
+  - 0.25
+  - 0.2
+  - 0.05
+  - 0.03
+  - 0.02
+countries:
+  US: "+1"
+  CA: "+1"
+  UK: "+44"
+  AU: "+61"
+  IN: "+91"
+  NG: "+234"
+  RU: "+7"
+  CN: "+86"
+sources:
+  - source: "MOBILE_APP"
+    weight: 
+      non_fraud: 0.6
+      fraud: 0.4
+  - source: "WEB"
+    weight:
+      non_fraud: 0.3
+      fraud: 0.5
+  - source: "POS"
+    weight:
+      non_fraud: 0.05
+      fraud: 0.05
+  - source: "PHONE"
+    weight:
+      non_fraud: 0.025
+      fraud: 0.025
+  - source: "ATM"
+    weight:
+      non_fraud: 0.025
+      fraud: 0.025
