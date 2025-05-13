@@ -1,7 +1,7 @@
 import psycopg2
 import uuid
 import random
-
+import faker
 def init_users():
     conn = psycopg2.connect(
         dbname='bank_fraud',
@@ -30,6 +30,7 @@ def init_users():
         for _ in range(count):
             data = (
                 str(uuid.uuid4()),     # user_id
+
                 None,                  # last_transaction_time
                 round(random.uniform(1000, 50000), 2),  # balance
                 profile,               # user_profile
